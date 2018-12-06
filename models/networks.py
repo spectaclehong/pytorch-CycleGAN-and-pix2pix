@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
-from torch.nn import init
+# from torch.nn import init
 import functools
 from torch.optim import lr_scheduler
+
 
 ###############################################################################
 # Helper Functions
@@ -259,7 +260,7 @@ class UnetGenerator(nn.Module):
 #   |-- downsampling -- |submodule| -- upsampling --|
 class UnetSkipConnectionBlock(nn.Module):
     def __init__(self, outer_nc, inner_nc, input_nc=None,
-                 submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False):
+                 submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False, upsampling='deconv'):
         super(UnetSkipConnectionBlock, self).__init__()
         self.outermost = outermost
         if type(norm_layer) == functools.partial:
@@ -276,9 +277,12 @@ class UnetSkipConnectionBlock(nn.Module):
         upnorm = norm_layer(outer_nc)
 
         if outermost:
-            upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
+            if upsampling == 'deconv':
+                upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
                                         kernel_size=4, stride=2,
                                         padding=1)
+            elif upsampling == 'bilinear':
+                upconv = torch.nn.UpsamplingBilinear2d(scale_factor=2)
             down = [downconv]
             up = [uprelu, upconv, nn.Tanh()]
             model = down + [submodule] + up
@@ -290,9 +294,12 @@ class UnetSkipConnectionBlock(nn.Module):
             up = [uprelu, upconv, upnorm]
             model = down + up
         else:
-            upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
+            if upsampling == 'deconv':
+                upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
                                         kernel_size=4, stride=2,
                                         padding=1, bias=use_bias)
+            elif upsampling == 'bilinear':
+                upconv = torch.nn.UpsamplingBilinear2d(scale_factor=2)
             down = [downrelu, downconv, downnorm]
             up = [uprelu, upconv, upnorm]
 
